@@ -1,6 +1,7 @@
 package znet
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"net"
@@ -17,6 +18,18 @@ type Server struct {
 	IP string
 	//服务器监听的端口号
 	Port int
+	//路由
+	Router ziface.IRouter
+}
+
+//定义当前客户端连接所绑定的api TODO 由用户自定义
+func Callback(conn *net.TCPConn, data []byte, cnt int) error {
+	log.Println("[conn handle] callback client...")
+	if _, err := conn.Write(data[:cnt]); err != nil {
+		log.Printf("write buffer error: {%s}\n", err)
+		return errors.New("callback error: " + err.Error())
+	}
+	return nil
 }
 
 func (s *Server) Start() {
@@ -35,6 +48,8 @@ func (s *Server) Start() {
 			return
 		}
 		log.Printf("[server start]server {%s} start success\n", s.Name)
+		var cid uint32
+		cid = 0
 		//3. 阻塞等待客户端连接，处理客户端连接业务
 		for {
 			//等待客户端连接，如果有连接，则返回   阻塞方法
@@ -43,25 +58,11 @@ func (s *Server) Start() {
 				log.Println("[server listening]server listen error: ", err)
 				continue
 			}
-			//对已经连接的客户端做一些业务
-			go func() {
-				//另起一个协程读取客户端传送的数据
-				for {
-					buffer := make([]byte, 512)
-					//cnt表示读取的数据大小
-					cnt, err2 := conn.Read(buffer)
-					if err2 != nil {
-						log.Println("[server receive]server receive from client error: ", err)
-						continue
-					}
-					log.Printf("receive from client: %s\n", string(buffer))
-					//发送给客户端
-					if _, err2 := conn.Write(buffer[:cnt]); err2 != nil {
-						log.Println("[server write]server write error: ", err2)
-						continue
-					}
-				}
-			}()
+			//将得到的TCP连接封装成自定义的Connection
+			clientConn := NewConnection(conn, cid, Callback)
+			cid++
+			//启动当前的连接业务处理
+			go clientConn.Start()
 		}
 	}()
 
@@ -79,6 +80,10 @@ func (s *Server) Stop() {
 	//TODO 停止服务器，将一些服务器的资源、状态或者一些已经开辟的连接进行回收
 }
 
+func (c *Server) AddRouter(router ziface.IRouter) {
+	c.Router = router
+}
+
 //初始化server的方法
 func NewServer(name string) ziface.IServer {
 	return &Server{
@@ -86,5 +91,6 @@ func NewServer(name string) ziface.IServer {
 		IpVersion: "tcp4",
 		IP:        "0.0.0.0",
 		Port:      8888,
+		Router:    nil,
 	}
 }
