@@ -59,7 +59,7 @@ func (s *Server) Start() {
 				continue
 			}
 			//将得到的TCP连接封装成自定义的Connection
-			clientConn := NewConnection(conn, cid, Callback)
+			clientConn := NewConnection(conn, cid, s.Router)
 			cid++
 			//启动当前的连接业务处理
 			go clientConn.Start()
@@ -80,8 +80,8 @@ func (s *Server) Stop() {
 	//TODO 停止服务器，将一些服务器的资源、状态或者一些已经开辟的连接进行回收
 }
 
-func (c *Server) AddRouter(router ziface.IRouter) {
-	c.Router = router
+func (s *Server) AddRouter(router ziface.IRouter) {
+	s.Router = router
 }
 
 //初始化server的方法
