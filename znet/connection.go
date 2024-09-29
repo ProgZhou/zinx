@@ -3,6 +3,7 @@ package znet
 import (
 	"log"
 	"net"
+	"zinx/utils"
 	"zinx/ziface"
 )
 
@@ -40,7 +41,7 @@ func (c *Connection) StartReader() {
 	defer c.Stop()
 	//从客户端读取数据
 	for {
-		buffer := make([]byte, 512)
+		buffer := make([]byte, utils.GlobalProperty.MaxBuffer)
 		_, err := c.Conn.Read(buffer)
 		if err != nil {
 			log.Printf("read from client error: {%s}\n", err)

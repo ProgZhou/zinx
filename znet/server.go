@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"zinx/utils"
 	"zinx/ziface"
 )
 
@@ -33,6 +34,8 @@ func Callback(conn *net.TCPConn, data []byte, cnt int) error {
 }
 
 func (s *Server) Start() {
+	log.Printf("server properties: server name=[%s] host=[%s], port=[%d]\n",
+		utils.GlobalProperty.Name, utils.GlobalProperty.Host, utils.GlobalProperty.Port)
 	log.Printf("[server starting]server listen on ip: %s, port: %d\n", s.IP, s.Port)
 	go func() {
 		//1. 获取一个TCP的地址
@@ -87,10 +90,10 @@ func (s *Server) AddRouter(router ziface.IRouter) {
 //初始化server的方法
 func NewServer(name string) ziface.IServer {
 	return &Server{
-		Name:      name,
+		Name:      utils.GlobalProperty.Name, //替换为全局配置中的值
 		IpVersion: "tcp4",
-		IP:        "0.0.0.0",
-		Port:      8888,
+		IP:        utils.GlobalProperty.Host,
+		Port:      utils.GlobalProperty.Port,
 		Router:    nil,
 	}
 }
