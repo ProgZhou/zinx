@@ -15,8 +15,9 @@ type GlobalProperties struct {
 	Port      int            `json:"port"` //服务器端口号
 	Name      string         `json:"name"` //服务器名称
 
-	Version   string `json:"version"`   //当前服务器版本号
-	MaxBuffer int    `json:"maxBuffer"` //当前服务器能够读取的缓冲区大小
+	Version        string `json:"version"`        //当前服务器版本号
+	MaxBuffer      int    `json:"maxBuffer"`      //当前服务器能够读取的缓冲区大小
+	MaxPackageSize int    `json:"maxPackageSize"` //能够传输的最大数据包的大小
 }
 
 //定义一个全局的对外对象
@@ -25,7 +26,7 @@ var GlobalProperty *GlobalProperties
 //加载配置文件的方法
 func (g *GlobalProperties) Load() {
 	dir, _ := os.Getwd()
-	data, err := os.ReadFile(fmt.Sprintf("%s/utils/conf/zinx.json", dir))
+	data, err := os.ReadFile(fmt.Sprintf("%s\\utils\\conf\\zinx.json", dir))
 	if err != nil {
 		log.Fatalln("properties read error: " + err.Error())
 	}
@@ -39,11 +40,12 @@ func (g *GlobalProperties) Load() {
 func init() {
 	//默认配置
 	GlobalProperty = &GlobalProperties{
-		Host:      "127.0.0.1",
-		Port:      8888,
-		Name:      "Zinx-Server",
-		Version:   "v0.4",
-		MaxBuffer: 512,
+		Host:           "127.0.0.1",
+		Port:           8888,
+		Name:           "Zinx-Server",
+		Version:        "v0.4",
+		MaxBuffer:      512,
+		MaxPackageSize: 4096,
 	}
 	GlobalProperty.Load()
 }

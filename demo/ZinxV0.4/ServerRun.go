@@ -9,7 +9,7 @@ import (
 //zinx应用程序
 
 func main() {
-	iServer := znet.NewServer("[zinx-v3.0]")
+	iServer := znet.NewServer("[zinx-v4.0]")
 	//给服务器添加自定义router
 	iServer.AddRouter(&PingRouter{})
 	//启动服务器

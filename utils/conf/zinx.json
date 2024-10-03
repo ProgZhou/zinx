@@ -2,5 +2,6 @@
   "name": "demo app v0.4",
   "host": "127.0.0.1",
   "port": 8999,
-  "maxBuffer": 1024
+  "maxBuffer": 1024,
+  "maxPackageSize": 8092
 }

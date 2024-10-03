@@ -1,9 +1,10 @@
 package znet
 
 import (
+	"errors"
+	"io"
 	"log"
 	"net"
-	"zinx/utils"
 	"zinx/ziface"
 )
 
@@ -41,24 +42,47 @@ func (c *Connection) StartReader() {
 	defer c.Stop()
 	//从客户端读取数据
 	for {
-		buffer := make([]byte, utils.GlobalProperty.MaxBuffer)
-		_, err := c.Conn.Read(buffer)
-		if err != nil {
+		//修改这部分代码，改为拆包读取
+		//buffer := make([]byte, utils.GlobalProperty.MaxBuffer)
+		//_, err := c.Conn.Read(buffer)
+		//if err != nil {
+		//	log.Printf("read from client error: {%s}\n", err)
+		//	c.ExitChan <- true
+		//	break
+		//}
+		//创建一个拆包、解包的类
+		dp := NewSerialization()
+
+		//读取消息头
+		messageHead := make([]byte, dp.GetDataLength())
+		if _, err := io.ReadFull(c.GetConnection(), messageHead); err != nil {
 			log.Printf("read from client error: {%s}\n", err)
 			c.ExitChan <- true
 			break
 		}
+		//读取消息长度和消息id
+		clientMessage, err := dp.UnPack(messageHead)
+		if err != nil {
+			log.Printf("data unpack error: {%s}\n", err.Error())
+			c.ExitChan <- true
+			break
+		}
 
-		//if err = c.handleApi(c.Conn, buffer, cnt); err != nil {
-		//	log.Printf("conn {%d} handle error: %s\n", c.ConnId, err)
-		//	c.ExitChan <- true
-		//	break
-		//}
-
+		//根据消息长度，再次读取data内容
+		var data []byte
+		if clientMessage.GetLen() > 0 {
+			data = make([]byte, clientMessage.GetLen())
+			if _, err := io.ReadFull(c.GetConnection(), data); err != nil {
+				log.Printf("data unpack error: {%s}\n", err.Error())
+				c.ExitChan <- true
+				break
+			}
+		}
+		clientMessage.SetData(data)
 		//得到当前Conn的Request数据
 		req := Request{
-			conn: c,
-			data: buffer,
+			conn:    c,
+			message: clientMessage,
 		}
 		//从路由中找到注册绑定的Conn对应的路由调度
 		go func(request ziface.IRequest) {
@@ -114,6 +138,22 @@ func (c *Connection) RemoteAddr() net.Addr {
 	return c.Conn.RemoteAddr()
 }
 
-func (c *Connection) Send(data []byte) error {
+//发送数据时，按照封包发送
+func (c *Connection) Send(messageId uint32, data []byte) error {
+	if c.IsClose {
+		return errors.New("connection is closed")
+	}
+	//将消息进行封装
+	dp := NewSerialization()
+	messagePack, err := dp.Pack(NewMessage(messageId, data))
+	if err != nil {
+		log.Printf("pack message error, message id: [%d]\n", messageId)
+		return errors.New("message package error")
+	}
+	//将数据发送给客户端
+	if _, err = c.Conn.Write(messagePack); err != nil {
+		log.Printf("message write error, message id: [%d]\n", messageId)
+		return errors.New("connection write error")
+	}
 	return nil
 }
