@@ -16,10 +16,10 @@ type Connection struct {
 	ConnId uint32
 	//连接状态
 	IsClose bool
-	//当前连接绑定的处理业务的api方法
-	//handleApi ziface.HandleFunc
 	//等待连接被动推出的channel
 	ExitChan chan bool
+	//无缓冲通道，用于读写协程之间的消息通信
+	MessageChan chan []byte
 	//消息管理模块
 	Handler ziface.IMessageHandler
 }
@@ -31,13 +31,15 @@ func NewConnection(conn *net.TCPConn, connId uint32, messageHandler ziface.IMess
 		ConnId:  connId,
 		IsClose: false,
 		//handleApi: callback,
-		ExitChan: make(chan bool, 1),
-		Handler:  messageHandler,
+		ExitChan:    make(chan bool, 1),
+		MessageChan: make(chan []byte),
+		Handler:     messageHandler,
 	}
 }
 
 func (c *Connection) StartReader() {
 	log.Printf("conn {%d} reader is running\n", c.ConnId)
+	defer log.Printf("conn {%d} reader exit\n", c.ConnId)
 	//完成业务之后关闭连接
 	defer c.Stop()
 	//从客户端读取数据
@@ -81,13 +83,35 @@ func (c *Connection) StartReader() {
 	}
 }
 
+//新增一个Writer写协程，将消息发送给客户端
+func (c *Connection) StartWriter() {
+	log.Printf("conn {%d} writer is running\n", c.ConnId)
+	defer log.Printf("conn {%d} writer exit\n", c.ConnId)
+	//不断阻塞等待channel的消息
+	for {
+		select {
+		case data := <-c.MessageChan:
+			//如果有数据的话
+			if _, err := c.Conn.Write(data); err != nil {
+				log.Printf("connection write message error: [%s]\n", err.Error())
+				return
+			} else {
+				log.Printf("")
+			}
+		case <-c.ExitChan:
+			//链接关闭，writer也要退出
+			return
+		}
+	}
+}
+
 //启动连接，使当前连接开始工作
 func (c *Connection) Start() {
 	log.Printf("conn start... conn id={%d}\n", c.ConnId)
 	//启动从当前连接读数据的业务
 	go c.StartReader()
-	//TODO 启动从当前连接写数据的业务
-
+	//启动从当前连接写数据的业务
+	go c.StartWriter()
 	for {
 		select {
 		case <-c.ExitChan:
@@ -137,10 +161,8 @@ func (c *Connection) Send(messageId uint32, data []byte) error {
 		log.Printf("pack message error, message id: [%d]\n", messageId)
 		return errors.New("message package error")
 	}
-	//将数据发送给客户端
-	if _, err = c.Conn.Write(messagePack); err != nil {
-		log.Printf("message write error, message id: [%d]\n", messageId)
-		return errors.New("connection write error")
-	}
+	//将数据发送给写协程
+	c.MessageChan <- messagePack
+	log.Printf("send message to writer: [%s]\n", string(messagePack))
 	return nil
 }
