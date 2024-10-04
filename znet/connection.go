@@ -20,19 +20,19 @@ type Connection struct {
 	//handleApi ziface.HandleFunc
 	//等待连接被动推出的channel
 	ExitChan chan bool
-	//该链接处理的方法router
-	Router ziface.IRouter
+	//消息管理模块
+	Handler ziface.IMessageHandler
 }
 
 //初始化连接的方法
-func NewConnection(conn *net.TCPConn, connId uint32, router ziface.IRouter) *Connection {
+func NewConnection(conn *net.TCPConn, connId uint32, messageHandler ziface.IMessageHandler) *Connection {
 	return &Connection{
 		Conn:    conn,
 		ConnId:  connId,
 		IsClose: false,
 		//handleApi: callback,
 		ExitChan: make(chan bool, 1),
-		Router:   router,
+		Handler:  messageHandler,
 	}
 }
 
@@ -42,14 +42,6 @@ func (c *Connection) StartReader() {
 	defer c.Stop()
 	//从客户端读取数据
 	for {
-		//修改这部分代码，改为拆包读取
-		//buffer := make([]byte, utils.GlobalProperty.MaxBuffer)
-		//_, err := c.Conn.Read(buffer)
-		//if err != nil {
-		//	log.Printf("read from client error: {%s}\n", err)
-		//	c.ExitChan <- true
-		//	break
-		//}
 		//创建一个拆包、解包的类
 		dp := NewSerialization()
 
@@ -84,13 +76,8 @@ func (c *Connection) StartReader() {
 			conn:    c,
 			message: clientMessage,
 		}
-		//从路由中找到注册绑定的Conn对应的路由调度
-		go func(request ziface.IRequest) {
-			c.Router.PreHandle(request)
-			c.Router.Handle(request)
-			c.Router.PostHandle(request)
-		}(&req)
-
+		//根据绑定号的messageId调度对应的处理方法
+		go c.Handler.DoMessageHandler(&req)
 	}
 }
 

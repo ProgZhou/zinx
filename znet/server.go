@@ -21,6 +21,8 @@ type Server struct {
 	Port int
 	//路由
 	Router ziface.IRouter
+	//server的消息管理模块，绑定messageId与对应业务的处理api
+	Handler ziface.IMessageHandler
 }
 
 //定义当前客户端连接所绑定的api TODO 由用户自定义
@@ -62,7 +64,7 @@ func (s *Server) Start() {
 				continue
 			}
 			//将得到的TCP连接封装成自定义的Connection
-			clientConn := NewConnection(conn, cid, s.Router)
+			clientConn := NewConnection(conn, cid, s.Handler)
 			cid++
 			//启动当前的连接业务处理
 			go clientConn.Start()
@@ -83,8 +85,10 @@ func (s *Server) Stop() {
 	//TODO 停止服务器，将一些服务器的资源、状态或者一些已经开辟的连接进行回收
 }
 
-func (s *Server) AddRouter(router ziface.IRouter) {
-	s.Router = router
+//修改AddRouter方法，改为将router添加至Handler中
+func (s *Server) AddRouter(messageId uint32, router ziface.IRouter) {
+	s.Handler.AddRouter(messageId, router)
+
 }
 
 //初始化server的方法
@@ -95,5 +99,6 @@ func NewServer(name string) ziface.IServer {
 		IP:        utils.GlobalProperty.Host,
 		Port:      utils.GlobalProperty.Port,
 		Router:    nil,
+		Handler:   NewMessageHandler(),
 	}
 }
