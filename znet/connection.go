@@ -5,6 +5,7 @@ import (
 	"io"
 	"log"
 	"net"
+	"zinx/utils"
 	"zinx/ziface"
 )
 
@@ -78,8 +79,15 @@ func (c *Connection) StartReader() {
 			conn:    c,
 			message: clientMessage,
 		}
-		//根据绑定号的messageId调度对应的处理方法
-		go c.Handler.DoMessageHandler(&req)
+		//判断是否已经开启工作池
+		if utils.GlobalProperty.WorkPoolSize > 0 {
+			//将消息发送给工作池处理
+			c.Handler.SendMessageToTaskQueue(&req)
+		} else {
+			//根据绑定号的messageId调度对应的处理方法
+			go c.Handler.DoMessageHandler(&req)
+		}
+
 	}
 }
 

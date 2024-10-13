@@ -15,9 +15,11 @@ type GlobalProperties struct {
 	Port      int            `json:"port"` //服务器端口号
 	Name      string         `json:"name"` //服务器名称
 
-	Version        string `json:"version"`        //当前服务器版本号
-	MaxBuffer      int    `json:"maxBuffer"`      //当前服务器能够读取的缓冲区大小
-	MaxPackageSize int    `json:"maxPackageSize"` //能够传输的最大数据包的大小
+	Version         string `json:"version"`         //当前服务器版本号
+	MaxBuffer       int    `json:"maxBuffer"`       //当前服务器能够读取的缓冲区大小
+	MaxPackageSize  int    `json:"maxPackageSize"`  //能够传输的最大数据包的大小
+	WorkPoolSize    int    `json:"workPoolSize"`    //处理消息协程池大小
+	MaxWorkTaskSize int    `json:"maxWorkTaskSize"` //worker消息队列的最大大小
 }
 
 //定义一个全局的对外对象
@@ -40,12 +42,14 @@ func (g *GlobalProperties) Load() {
 func init() {
 	//默认配置
 	GlobalProperty = &GlobalProperties{
-		Host:           "127.0.0.1",
-		Port:           8888,
-		Name:           "Zinx-Server",
-		Version:        "v0.4",
-		MaxBuffer:      512,
-		MaxPackageSize: 4096,
+		Host:            "127.0.0.1",
+		Port:            8888,
+		Name:            "Zinx-Server",
+		Version:         "v0.4",
+		MaxBuffer:       512,
+		MaxPackageSize:  4096,
+		WorkPoolSize:    10,
+		MaxWorkTaskSize: 1024,
 	}
 	GlobalProperty.Load()
 }

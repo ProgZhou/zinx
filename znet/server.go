@@ -40,6 +40,8 @@ func (s *Server) Start() {
 		utils.GlobalProperty.Name, utils.GlobalProperty.Host, utils.GlobalProperty.Port)
 	log.Printf("[server starting]server listen on ip: %s, port: %d\n", s.IP, s.Port)
 	go func() {
+		//0. 开启消息队列和工作池
+		s.Handler.StartWorkPool()
 		//1. 获取一个TCP的地址
 		addr, err := net.ResolveTCPAddr(s.IpVersion, fmt.Sprintf("%s:%d", s.IP, s.Port))
 		if err != nil {
