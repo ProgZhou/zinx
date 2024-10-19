@@ -23,6 +23,12 @@ type Server struct {
 	Router ziface.IRouter
 	//server的消息管理模块，绑定messageId与对应业务的处理api
 	Handler ziface.IMessageHandler
+	//连接管理模块
+	ConnectionManager ziface.IConnManager
+	//创建连接之后自动调用的hook函数
+	OnConnectionStart func(conn ziface.IConnection)
+	//销毁连接之后自动调用的hook函数
+	OnConnectionStop func(conn ziface.IConnection)
 }
 
 //定义当前客户端连接所绑定的api TODO 由用户自定义
@@ -59,6 +65,11 @@ func (s *Server) Start() {
 		cid = 0
 		//3. 阻塞等待客户端连接，处理客户端连接业务
 		for {
+			//判断当前连接数是否超过最大连接数，如果是，则等待
+			if s.ConnectionManager.Size() >= utils.GlobalProperty.MaxConnectionSize {
+				log.Printf("connection has limited [%d] wait for a minitue\n", utils.GlobalProperty.MaxConnectionSize)
+				continue
+			}
 			//等待客户端连接，如果有连接，则返回   阻塞方法
 			conn, err := listener.AcceptTCP()
 			if err != nil {
@@ -66,7 +77,7 @@ func (s *Server) Start() {
 				continue
 			}
 			//将得到的TCP连接封装成自定义的Connection
-			clientConn := NewConnection(conn, cid, s.Handler)
+			clientConn := NewConnection(s, conn, cid, s.Handler)
 			cid++
 			//启动当前的连接业务处理
 			go clientConn.Start()
@@ -84,7 +95,9 @@ func (s *Server) Serve() {
 }
 
 func (s *Server) Stop() {
-	//TODO 停止服务器，将一些服务器的资源、状态或者一些已经开辟的连接进行回收
+	//停止服务器，将一些服务器的资源、状态或者一些已经开辟的连接进行回收
+	log.Printf("zinx server[%s] stopped\n", s.Name)
+	s.ConnectionManager.ClearConnection()
 }
 
 //修改AddRouter方法，改为将router添加至Handler中
@@ -93,14 +106,41 @@ func (s *Server) AddRouter(messageId uint32, router ziface.IRouter) {
 
 }
 
+func (s *Server) GetConnManager() ziface.IConnManager {
+	return s.ConnectionManager
+}
+
+func (s *Server) SetConnectionStart(hookFunc func(conn ziface.IConnection)) {
+	log.Printf("ConnectionStart() hook register success\n")
+	s.OnConnectionStart = hookFunc
+}
+
+func (s *Server) SetConnectionStop(hookFunc func(conn ziface.IConnection)) {
+	log.Printf("ConnectionStop() hook register success\n")
+	s.OnConnectionStop = hookFunc
+}
+
+func (s *Server) CallConnStart(conn ziface.IConnection) {
+	if s.OnConnectionStart != nil {
+		s.OnConnectionStart(conn)
+	}
+}
+
+func (s *Server) CallConnStop(conn ziface.IConnection) {
+	if s.OnConnectionStop != nil {
+		s.OnConnectionStop(conn)
+	}
+}
+
 //初始化server的方法
 func NewServer(name string) ziface.IServer {
 	return &Server{
-		Name:      utils.GlobalProperty.Name, //替换为全局配置中的值
-		IpVersion: "tcp4",
-		IP:        utils.GlobalProperty.Host,
-		Port:      utils.GlobalProperty.Port,
-		Router:    nil,
-		Handler:   NewMessageHandler(),
+		Name:              utils.GlobalProperty.Name, //替换为全局配置中的值
+		IpVersion:         "tcp4",
+		IP:                utils.GlobalProperty.Host,
+		Port:              utils.GlobalProperty.Port,
+		Router:            nil,
+		Handler:           NewMessageHandler(),
+		ConnectionManager: NewConnManager(),
 	}
 }

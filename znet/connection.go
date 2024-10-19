@@ -23,11 +23,13 @@ type Connection struct {
 	MessageChan chan []byte
 	//消息管理模块
 	Handler ziface.IMessageHandler
+	//当前连接所属的TCP服务器
+	ZinxServer ziface.IServer
 }
 
 //初始化连接的方法
-func NewConnection(conn *net.TCPConn, connId uint32, messageHandler ziface.IMessageHandler) *Connection {
-	return &Connection{
+func NewConnection(server ziface.IServer, conn *net.TCPConn, connId uint32, messageHandler ziface.IMessageHandler) *Connection {
+	c := &Connection{
 		Conn:    conn,
 		ConnId:  connId,
 		IsClose: false,
@@ -35,7 +37,11 @@ func NewConnection(conn *net.TCPConn, connId uint32, messageHandler ziface.IMess
 		ExitChan:    make(chan bool, 1),
 		MessageChan: make(chan []byte),
 		Handler:     messageHandler,
+		ZinxServer:  server,
 	}
+	//将连接添加到连接管理中
+	c.ZinxServer.GetConnManager().AddConnection(c)
+	return c
 }
 
 func (c *Connection) StartReader() {
@@ -120,6 +126,7 @@ func (c *Connection) Start() {
 	go c.StartReader()
 	//启动从当前连接写数据的业务
 	go c.StartWriter()
+	c.ZinxServer.CallConnStart(c)
 	for {
 		select {
 		case <-c.ExitChan:
@@ -139,8 +146,11 @@ func (c *Connection) Stop() {
 	c.IsClose = true
 	//关闭tcp连接
 	c.Conn.Close()
+	c.ZinxServer.CallConnStop(c)
 	//通知从缓冲队列读数据的业务，该链接已经关闭
 	c.ExitChan <- true
+	//将当前连接从连接管理模块中摘除
+	c.ZinxServer.GetConnManager().RemoveConnection(c)
 	//关闭管道 回收资源
 	close(c.ExitChan)
 }

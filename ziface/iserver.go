@@ -10,4 +10,14 @@ type IServer interface {
 	Stop()
 	//路由功能：给当前的服务注册一个路由方法，供客户端的连接处理使用
 	AddRouter(messageId uint32, router IRouter)
+	//获取当前服务器的连接管理
+	GetConnManager() IConnManager
+	//设置连接建立时的钩子函数
+	SetConnectionStart(hookFunc func(conn IConnection))
+	//设置连接释放时的钩子函数
+	SetConnectionStop(hookFunc func(conn IConnection))
+	//调用连接建立时的钩子函数
+	CallConnStart(conn IConnection)
+	//调用连接释放时的钩子函数
+	CallConnStop(conn IConnection)
 }
