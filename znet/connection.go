@@ -5,6 +5,7 @@ import (
 	"io"
 	"log"
 	"net"
+	"sync"
 	"zinx/utils"
 	"zinx/ziface"
 )
@@ -25,6 +26,10 @@ type Connection struct {
 	Handler ziface.IMessageHandler
 	//当前连接所属的TCP服务器
 	ZinxServer ziface.IServer
+	//用户自定义属性
+	Properties map[string]interface{}
+	//保护自定义属性读写的锁
+	porpertyLock sync.RWMutex
 }
 
 //初始化连接的方法
@@ -183,4 +188,30 @@ func (c *Connection) Send(messageId uint32, data []byte) error {
 	c.MessageChan <- messagePack
 	log.Printf("send message to writer: [%s]\n", string(messagePack))
 	return nil
+}
+
+//设置自定义属性
+func (c *Connection) SetProperty(key string, value interface{}) {
+	c.porpertyLock.Lock()
+	defer c.porpertyLock.Unlock()
+	c.Properties[key] = value
+
+}
+
+//获取自定义属性的值
+func (c *Connection) GetProperty(key string) (interface{}, error) {
+	c.porpertyLock.RLock()
+	defer c.porpertyLock.RUnlock()
+	if value, ok := c.Properties[key]; ok {
+		return value, nil
+	} else {
+		return nil, errors.New(key + " property not found")
+	}
+}
+
+//删除自定义属性
+func (c *Connection) RemoveProperty(key string) {
+	c.porpertyLock.Lock()
+	defer c.porpertyLock.Unlock()
+	delete(c.Properties, key)
 }
